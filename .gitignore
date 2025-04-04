@@ -7,3 +7,4 @@ size
 test/build
 build
 .pio
+/sdkconfig.espidf
