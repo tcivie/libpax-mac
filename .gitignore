@@ -5,6 +5,5 @@ sdkconfig.old
 size
 .vscode
 test/build
-build
 .pio
 /sdkconfig.espidf
