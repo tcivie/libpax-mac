@@ -6,4 +6,5 @@ size
 .vscode
 test/build
 .pio
-/sdkconfig.espidf
+sdkconfig.espidf
+**/CMakeLists.txt
