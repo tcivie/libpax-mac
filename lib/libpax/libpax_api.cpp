@@ -26,6 +26,8 @@ int config_set = 0;
 
 void (*report_callback)(void);
 struct count_payload_t* pCurrent_count;
+struct pax_device_list_t* pCurrent_list;
+
 int counter_mode;
 
 void fill_counter(struct count_payload_t* pCount) {
@@ -34,18 +36,30 @@ void fill_counter(struct count_payload_t* pCount) {
   pCount->pax = pCount->wifi_count + pCount->ble_count;
 }
 
-void libpax_counter_reset() {
+void fill_collector(struct pax_device_list_t* pList) {
+  pList->capacity = libpax_list_capacity();
+  pList->count = libpax_list_count();
+  pList->devices = libpax_list_devices();
+}
+
+void reset_counter() {
   macs_wifi = 0;
   macs_ble = 0;
   reset_bucket();
 }
 
+void libpax_reset() {
+  reset_counter();
+  reset_list();
+}
+
 void report(TimerHandle_t xTimer) {
   fill_counter(pCurrent_count);
+  fill_collector(pCurrent_list);
   report_callback();
   // clear counter if not in cumulative counter mode
   if (counter_mode != 1) {
-    libpax_counter_reset();
+    libpax_reset();
   }
 }
 
@@ -74,11 +88,11 @@ int libpax_deserialize_config(char* source,
     return -1;
   }
   if (storage_buffer.minor_version != CONFIG_MINOR_VERSION) {
-    ESP_LOGW(
-        "libpax",
-        "Restoring config with different MINOR version: %d.%d instead of %d.%d",
-        storage_buffer.major_version, storage_buffer.minor_version,
-        CONFIG_MAJOR_VERSION, CONFIG_MINOR_VERSION);
+    ESP_LOGW("libpax",
+             "Restoring config with different MINOR version: %d.%d instead "
+             "of %d.%d",
+             storage_buffer.major_version, storage_buffer.minor_version,
+             CONFIG_MAJOR_VERSION, CONFIG_MINOR_VERSION);
   }
   memcpy(configuration, &(storage_buffer.config),
          sizeof(struct libpax_config_t));
@@ -135,10 +149,10 @@ int libpax_update_config(struct libpax_config_t* configuration) {
 }
 
 TimerHandle_t PaxReportTimer = NULL;
-int libpax_counter_init(void (*init_callback)(void),
-                        struct count_payload_t* init_current_count,
-                        uint16_t init_pax_report_interval_sec,
-                        int init_counter_mode) {
+int libpax_init(void (*init_callback)(),
+                struct count_payload_t* init_current_count,
+                pax_device_list_t* device_list,
+                uint16_t init_pax_report_interval_sec, int init_counter_mode) {
   if (PaxReportTimer != NULL && xTimerIsTimerActive(PaxReportTimer)) {
     ESP_LOGW("libpax", "lib already active. Ignoring new init.");
     return -1;
@@ -146,9 +160,10 @@ int libpax_counter_init(void (*init_callback)(void),
 
   report_callback = init_callback;
   pCurrent_count = init_current_count;
+  pCurrent_list = device_list;
   counter_mode = init_counter_mode;
 
-  libpax_counter_reset();
+  libpax_reset();
 
   PaxReportTimer = xTimerCreate(
       "PaxReportTimer", pdMS_TO_TICKS(init_pax_report_interval_sec * 1000),
@@ -161,14 +176,16 @@ int libpax_counter_init(void (*init_callback)(void),
 #define LIBPAX_STOPPED 2
 int libpax_state = LIBPAX_STOPPED;
 
-int libpax_counter_start() {
+int libpax_start() {
   if (config_set == 0) {
-    ESP_LOGE("libpax", "Configuration was not yet set, aborting libpax_counter_start.");
+    ESP_LOGE("libpax",
+             "Configuration was not yet set, aborting libpax_counter_start.");
     return -1;
   }
 
   if (libpax_state != LIBPAX_STOPPED) {
-    ESP_LOGW("libpax", "libpax was not in stopped state, not executing start again.");
+    ESP_LOGW("libpax",
+             "libpax was not in stopped state, not executing start again.");
     return -1;
   }
 
@@ -190,7 +207,7 @@ int libpax_counter_start() {
   return 0;
 }
 
-int libpax_counter_stop() {
+int libpax_stop() {
   if (PaxReportTimer == NULL) {
     ESP_LOGI("libpax", "libpax requested to stop, but not running.");
     return -1;
@@ -205,7 +222,12 @@ int libpax_counter_stop() {
   return 0;
 }
 
-int libpax_counter_count(struct count_payload_t* count) {
+int libpax_count(struct count_payload_t* count) {
   fill_counter(count);
+  return 0;
+}
+
+int libpax_list(pax_device_list_t* device_list) {
+  fill_collector(device_list);
   return 0;
 }

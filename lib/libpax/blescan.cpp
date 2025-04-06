@@ -181,11 +181,7 @@ void hci_evt_process(void *pvParameters) {
           // Count each advertising report within rssi threshold
           for (uint8_t i = 0; i < num_responses; i += 1) {
             rssi = -(0xFF - queue_data[data_ptr++]);
-            if (ble_rssi_threshold && (rssi < ble_rssi_threshold))
-              continue;  // do not count weak signal mac
-            else {
-              mac_add(addr + 6 * i, MAC_SNIFF_BLE);
-            }
+            mac_add(addr, MAC_SNIFF_BLE, rssi);
           }
 
         // freeing all spaces allocated
@@ -252,7 +248,7 @@ void start_BLE_scan(uint16_t blescantime, uint16_t blescanwindow,
             hci_cmd_send_ble_scan_start();
             ++cmd_cnt;
             break;
-            
+
           // all commands done
           default:
             continue_commands = 0;

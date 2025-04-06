@@ -29,9 +29,9 @@ Which in turn is based of Łukasz Marcin Podkalicki's ESP32/016 WiFi Sniffer
  * https://github.com/lpodkalicki/blog/tree/master/esp32/016_wifi_sniffer
 
 */
+#include "wifiscan.h"
 #include "globals.h"
 #include "libpax.h"
-#include "wifiscan.h"
 
 TimerHandle_t WifiChanTimer;
 int initialized_wifi = 0;
@@ -48,11 +48,7 @@ static IRAM_ATTR void wifi_sniffer_packet_handler(
   const wifi_ieee80211_packet_t* ipkt = (wifi_ieee80211_packet_t*)ppkt->payload;
   const wifi_ieee80211_mac_hdr_t* hdr = &ipkt->hdr;
 
-  if ((wifi_rssi_threshold) &&
-      (ppkt->rx_ctrl.rssi < wifi_rssi_threshold))  // rssi is negative value
-    return;
-  else
-    mac_add((uint8_t*)hdr->addr2, MAC_SNIFF_WIFI);
+  mac_add((uint8_t*)(hdr->addr2), MAC_SNIFF_WIFI, ppkt->rx_ctrl.rssi);
 }
 
 // Software-timer driven Wifi channel rotation callback function
