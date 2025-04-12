@@ -47,6 +47,16 @@ int libpax_stop();
  */
 int libpax_count(struct count_payload_t* count);
 
+/**
+ *   Populates the given `pax_device_list_t` structure with information about
+ * available devices and their details.
+ *   @param[out] device_list A pointer to a `pax_device_list_t` structure that
+ * will be updated to contain the current list of detected devices, the count of
+ * those devices, and the list's maximum capacity.
+ *   @return Always returns 0 (success).
+ */
+int libpax_list(pax_device_list_t* device_list);
+
 /*
  * Size in bytes of a serialized config
  */
