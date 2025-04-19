@@ -107,35 +107,23 @@ IRAM_ATTR void reset_list() {
   ESP_LOGI("libpax", "[DEBUG] reset_list called, g_device_list=%p",
            g_device_list);
 
-  if (g_device_list) {
-    ESP_LOGI("libpax", "[DEBUG] Freeing device list with %d devices",
-             g_device_list->count);
-
-    if (g_device_list->devices) {
-      ESP_LOGI("libpax", "[DEBUG] Freeing devices array at %p",
-               g_device_list->devices);
-      free(g_device_list->devices);
-      g_device_list->devices = NULL;
-    } else {
-      ESP_LOGW("libpax",
-               "[DEBUG] g_device_list->devices is NULL in reset_list");
-    }
-
-    ESP_LOGI("libpax", "[DEBUG] Freeing g_device_list at %p", g_device_list);
-    free(g_device_list);
-    g_device_list = NULL;
-  } else {
-    ESP_LOGW("libpax",
-             "[DEBUG] reset_list called but g_device_list is already NULL");
-  }
-
-  // Re-initialize the device list
-  ESP_LOGI("libpax", "[DEBUG] Reinitializing device list after reset");
-  g_device_list = init_device_list();
   if (g_device_list == NULL) {
-    ESP_LOGE("libpax",
-             "[DEBUG] Failed to reinitialize device list after reset");
+    // If g_device_list doesn't exist yet, initialize it
+    ESP_LOGI("libpax", "[DEBUG] g_device_list is NULL, initializing");
+    g_device_list = init_device_list();
+    if (g_device_list == NULL) {
+      ESP_LOGE("libpax", "[DEBUG] Failed to initialize device list");
+    }
+    return;
   }
+
+  // Just reset the count but keep the allocated memory
+  ESP_LOGI("libpax", "[DEBUG] Resetting device list count (was %d)",
+           g_device_list->count);
+  g_device_list->count = 0;
+
+  // No need to free anything - we're keeping the allocated memory
+  ESP_LOGI("libpax", "[DEBUG] Device list reset successfully");
 }
 
 void reset_bucket() {

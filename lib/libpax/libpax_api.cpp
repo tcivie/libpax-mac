@@ -50,25 +50,36 @@ void fill_counter(struct count_payload_t* pCount) {
 
 void fill_collector(struct pax_device_list_t* pList) {
   if (pList == NULL) {
-    ESP_LOGE("libpax", "NULL pointer in fill_collector");
+    ESP_LOGE("libpax", "[DEBUG] NULL pointer in fill_collector");
     return;
   }
 
-  pList->capacity = libpax_list_capacity();
-  pList->count = libpax_list_count();
+  // Get capacity and count first
+  size_t capacity = libpax_list_capacity();
+  size_t count = libpax_list_count();
 
   // Free previous devices array if it exists
   if (pList->devices != NULL) {
+    ESP_LOGI("libpax", "[DEBUG] Freeing previous devices array at %p",
+             pList->devices);
     free(pList->devices);
     pList->devices = NULL;
   }
 
-  pList->devices = libpax_list_devices();
+  // Update the list properties
+  pList->capacity = capacity;
+  pList->count = count;
 
-  // Check if allocation was successful
-  if (pList->devices == NULL && pList->count > 0) {
-    ESP_LOGE("libpax", "Failed to allocate memory for device list");
-    pList->count = 0;
+  // Only try to get devices if there are some to get
+  if (count > 0) {
+    pList->devices = libpax_list_devices();
+
+    if (pList->devices == NULL) {
+      ESP_LOGE("libpax", "[DEBUG] Failed to get devices in fill_collector");
+      pList->count = 0;  // Reset count since we couldn't get devices
+    }
+  } else {
+    pList->devices = NULL;
   }
 }
 
