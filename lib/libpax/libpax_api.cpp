@@ -37,9 +37,20 @@ void fill_counter(struct count_payload_t* pCount) {
 }
 
 void fill_collector(struct pax_device_list_t* pList) {
+  if (pList == NULL) {
+    ESP_LOGE("libpax", "NULL pointer in fill_collector");
+    return;
+  }
+
   pList->capacity = libpax_list_capacity();
   pList->count = libpax_list_count();
   pList->devices = libpax_list_devices();
+
+  // Check if allocation was successful
+  if (pList->devices == NULL && pList->count > 0) {
+    ESP_LOGE("libpax", "Failed to allocate memory for device list");
+    pList->count = 0;
+  }
 }
 
 void reset_counter() {
@@ -54,9 +65,30 @@ void libpax_reset() {
 }
 
 void report(TimerHandle_t xTimer) {
+  // Check pointers
+  if (pCurrent_count == NULL || pCurrent_list == NULL) {
+    ESP_LOGE("libpax", "NULL pointers in report: count=%p, list=%p",
+             pCurrent_count, pCurrent_list);
+    return;
+  }
+
+  // Free previous device list if it exists
+  if (pCurrent_list->devices != NULL) {
+    free(pCurrent_list->devices);
+    pCurrent_list->devices = NULL;
+  }
+
   fill_counter(pCurrent_count);
   fill_collector(pCurrent_list);
+
+  // Check callback
+  if (report_callback == NULL) {
+    ESP_LOGE("libpax", "report_callback is NULL");
+    return;
+  }
+
   report_callback();
+
   // clear counter if not in cumulative counter mode
   if (counter_mode != 1) {
     libpax_reset();
@@ -148,14 +180,22 @@ int libpax_update_config(struct libpax_config_t* configuration) {
   return result;
 }
 
-TimerHandle_t PaxReportTimer = NULL;
+TimerHandle_t PaxReportTimer = nullptr;
 int libpax_init(void (*init_callback)(),
                 struct count_payload_t* init_current_count,
-                pax_device_list_t* device_list,
+                struct pax_device_list_t* device_list,
                 uint16_t init_pax_report_interval_sec, int init_counter_mode) {
-  if (PaxReportTimer != NULL && xTimerIsTimerActive(PaxReportTimer)) {
+  if (PaxReportTimer != nullptr && xTimerIsTimerActive(PaxReportTimer)) {
     ESP_LOGW("libpax", "lib already active. Ignoring new init.");
     return -1;
+  }
+
+  // Validate parameters
+  if (init_current_count == nullptr || device_list == nullptr) {
+    ESP_LOGE("libpax",
+             "NULL pointers provided to libpax_init. count=%p, list=%p",
+             init_current_count, device_list);
+    return -2;  // Return different error code for null pointers
   }
 
   report_callback = init_callback;
@@ -168,7 +208,17 @@ int libpax_init(void (*init_callback)(),
   PaxReportTimer = xTimerCreate(
       "PaxReportTimer", pdMS_TO_TICKS(init_pax_report_interval_sec * 1000),
       pdTRUE, (void*)0, report);
-  xTimerStart(PaxReportTimer, 0);
+
+  if (PaxReportTimer == nullptr) {
+    ESP_LOGE("libpax", "Failed to create PaxReportTimer");
+    return -3;
+  }
+
+  if (xTimerStart(PaxReportTimer, 0) != pdPASS) {
+    ESP_LOGE("libpax", "Failed to start PaxReportTimer");
+    return -4;
+  }
+
   return 0;
 }
 

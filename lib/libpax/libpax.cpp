@@ -39,22 +39,28 @@ uint16_t macs_ble = 0;
 
 uint8_t channel = 0;  // channel rotation counter
 
-DRAM_ATTR pax_device_list_t *g_device_list = init_device_list();
+DRAM_ATTR pax_device_list_t *g_device_list = NULL;
 
+// Add initialization log
 pax_device_list_t *init_device_list() {
-  g_device_list = (pax_device_list_t *)malloc(sizeof(pax_device_list_t));
-  if (g_device_list != NULL) {
-    g_device_list->devices = (pax_device_info_t *)malloc(
-        LIBPAX_MAX_SIZE * sizeof(pax_device_info_t));
-    if (g_device_list->devices != NULL) {
-      g_device_list->capacity = LIBPAX_DEVICE_LIST_SIZE;
-      g_device_list->count = 0;
+  ESP_LOGI("libpax", "Initializing device list with capacity %d",
+           LIBPAX_DEVICE_LIST_SIZE);
+  pax_device_list_t *list =
+      (pax_device_list_t *)malloc(sizeof(pax_device_list_t));
+  if (list != NULL) {
+    // Only allocate the memory we actually need (LIBPAX_DEVICE_LIST_SIZE
+    // instead of LIBPAX_MAX_SIZE)
+    list->devices = (pax_device_info_t *)malloc(LIBPAX_DEVICE_LIST_SIZE *
+                                                sizeof(pax_device_info_t));
+    if (list->devices != NULL) {
+      list->capacity = LIBPAX_DEVICE_LIST_SIZE;
+      list->count = 0;
     } else {
-      free(g_device_list);
-      g_device_list = NULL;
+      free(list);
+      list = NULL;
     }
   }
-  return g_device_list;
+  return list;
 }
 
 IRAM_ATTR void set_id(bitmap_t *bitmap, uint16_t id) {
@@ -81,7 +87,11 @@ IRAM_ATTR int add_to_bucket(uint16_t id) {
 
 IRAM_ATTR void reset_list() {
   if (g_device_list) {
-    free(g_device_list->devices);
+    ESP_LOGI("libpax", "Freeing device list with %d devices",
+             g_device_list->count);
+    if (g_device_list->devices) {
+      free(g_device_list->devices);
+    }
     free(g_device_list);
     g_device_list = NULL;
   }
@@ -100,15 +110,20 @@ int libpax_list_capacity() { return g_device_list->capacity; }
 int libpax_list_count() { return g_device_list->count; }
 
 pax_device_info_t *libpax_list_devices() {
-  auto *devices =
-      (pax_device_info_t *)malloc(LIBPAX_MAX_SIZE * sizeof(pax_device_info_t));
+  if (g_device_list == NULL || g_device_list->count == 0) {
+    return NULL;
+  }
+
+  // Allocate only the space needed for the actual count, not LIBPAX_MAX_SIZE
+  pax_device_info_t *devices = (pax_device_info_t *)malloc(
+      g_device_list->count * sizeof(pax_device_info_t));
+
+  if (devices == NULL) {
+    return NULL;
+  }
 
   for (int i = 0; i < g_device_list->count; i++) {
-    // int j = i * sizeof(pax_device_info_t); // TODO: verify what size our jump
-    memcpy(devices[i].mac, g_device_list->devices[i].mac, 6);
-    devices[i].type = g_device_list->devices[i].type;
-    devices[i].rssi = g_device_list->devices[i].rssi;
-    devices[i].timestamp = g_device_list->devices[i].timestamp;
+    memcpy(&devices[i], &g_device_list->devices[i], sizeof(pax_device_info_t));
   }
   return devices;
 }
