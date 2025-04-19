@@ -27,6 +27,7 @@ int config_set = 0;
 void (*report_callback)(void);
 struct count_payload_t* pCurrent_count;
 struct pax_device_list_t* pCurrent_list;
+extern pax_device_list_t* g_device_list;
 
 int counter_mode;
 
@@ -48,52 +49,26 @@ void fill_counter(struct count_payload_t* pCount) {
 }
 
 void fill_collector(struct pax_device_list_t* pList) {
-  ESP_LOGI("libpax", "[DEBUG] fill_collector called with pList=%p", pList);
-
   if (pList == NULL) {
-    ESP_LOGE("libpax", "[DEBUG] NULL pointer in fill_collector");
-    return;
-  }
-
-  if (g_device_list == NULL) {
-    ESP_LOGE("libpax",
-             "[DEBUG] g_device_list not initialized in fill_collector");
-    pList->capacity = 0;
-    pList->count = 0;
-    pList->devices = NULL;
+    ESP_LOGE("libpax", "NULL pointer in fill_collector");
     return;
   }
 
   pList->capacity = libpax_list_capacity();
   pList->count = libpax_list_count();
 
-  ESP_LOGI("libpax", "[DEBUG] fill_collector: capacity=%d, count=%d",
-           pList->capacity, pList->count);
-
   // Free previous devices array if it exists
   if (pList->devices != NULL) {
-    ESP_LOGI("libpax", "[DEBUG] Freeing previous devices array at %p",
-             pList->devices);
     free(pList->devices);
     pList->devices = NULL;
   }
 
-  // Get new devices array
   pList->devices = libpax_list_devices();
 
-  if (pList->devices == NULL) {
-    if (pList->count > 0) {
-      ESP_LOGE("libpax",
-               "[DEBUG] Failed to get devices list even though count=%d",
-               pList->count);
-      pList->count = 0;
-    } else {
-      ESP_LOGI("libpax", "[DEBUG] No devices to list (count=0)");
-    }
-  } else {
-    ESP_LOGI("libpax",
-             "[DEBUG] Successfully got devices list at %p with count=%d",
-             pList->devices, pList->count);
+  // Check if allocation was successful
+  if (pList->devices == NULL && pList->count > 0) {
+    ESP_LOGE("libpax", "Failed to allocate memory for device list");
+    pList->count = 0;
   }
 }
 

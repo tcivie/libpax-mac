@@ -192,6 +192,12 @@ pax_device_info_t *libpax_list_devices() {
     return NULL;
   }
 
+  // Check if devices array exists
+  if (g_device_list->devices == NULL) {
+    ESP_LOGE("libpax", "[DEBUG] libpax_list_devices: devices array is NULL");
+    return NULL;
+  }
+
   ESP_LOGI("libpax", "[DEBUG] Allocating memory for %d devices (%d bytes)",
            g_device_list->count,
            g_device_list->count * sizeof(pax_device_info_t));
@@ -210,12 +216,6 @@ pax_device_info_t *libpax_list_devices() {
   ESP_LOGI("libpax", "[DEBUG] Allocated devices array at %p", devices);
 
   for (int i = 0; i < g_device_list->count; i++) {
-    if (&g_device_list->devices[i] == NULL) {
-      ESP_LOGE("libpax", "[DEBUG] Source device at index %d is NULL", i);
-      free(devices);
-      return NULL;
-    }
-
     ESP_LOGD("libpax",
              "[DEBUG] Copying device %d: MAC=%02x:%02x:%02x:%02x:%02x:%02x", i,
              g_device_list->devices[i].mac[0], g_device_list->devices[i].mac[1],
